@@ -22,6 +22,7 @@
 static int p1PrevPos;
 static int p2PrevPos;
 static Vector2 collisionPos = { -100, -100 };
+static Color gridWhite;
 
 void reset( GameWorld *gw );
 
@@ -32,11 +33,11 @@ GameWorld* createGameWorld( void ) {
 
     GameWorld *gw = (GameWorld*) malloc( sizeof( GameWorld ) );
 
-    gw->cellWidth = 5;
+    gw->cellWidth = 10;
     gw->rows = (int) ( GetScreenHeight() / gw->cellWidth );
     gw->cols = (int) ( GetScreenWidth() / gw->cellWidth );
     gw->grid = (int*) malloc( sizeof(int) * gw->rows * gw->cols );
-    gw->drawGridOutline = false;
+    gw->drawGridOutline = true;
 
     gw->p1.cellWidth = gw->cellWidth;
     gw->p1.color = BLUE;
@@ -48,6 +49,8 @@ GameWorld* createGameWorld( void ) {
 
     reset( gw );
     gw->state = GAME_STATE_START;
+
+    gridWhite = Fade( WHITE, 0.5f );
 
     return gw;
 
@@ -139,6 +142,16 @@ void drawGameWorld( GameWorld *gw ) {
     BeginDrawing();
     ClearBackground( BLACK );
 
+    if ( gw->drawGridOutline ) {
+        float gridOffset = gw->cellWidth / 2;
+        for ( int i = 1; i <= gw->rows; i++ ) {
+            DrawLine( 0, i*gw->cellWidth - gridOffset, GetScreenWidth(), i*gw->cellWidth - gridOffset, gridWhite );
+        }
+        for ( int i = 1; i <= gw->cols; i++ ) {
+            DrawLine( i*gw->cellWidth - gridOffset, 0, i*gw->cellWidth - gridOffset, GetScreenHeight(), gridWhite );
+        }
+    }
+
     drawPlayer( &gw->p1 );
     drawPlayer( &gw->p2 );
 
@@ -169,15 +182,6 @@ void drawGameWorld( GameWorld *gw ) {
     }
 
     DrawCircleV( collisionPos, 20, RED );
-
-    if ( gw->drawGridOutline ) {
-        for ( int i = 1; i < gw->rows; i++ ) {
-            DrawLine( 0, i*gw->cellWidth, GetScreenWidth(), i*gw->cellWidth, WHITE );
-        }
-        for ( int i = 1; i < gw->cols; i++ ) {
-            DrawLine( i*gw->cellWidth, 0, i*gw->cellWidth, GetScreenHeight(), WHITE );
-        }
-    }
 
     const char *scoreP1 = TextFormat( "%d", gw->p1.score );
     const char *scoreP2 = TextFormat( "%d", gw->p2.score );
