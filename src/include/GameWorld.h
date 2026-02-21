@@ -25,6 +25,8 @@ typedef struct GameWorld {
 
     GameState state;
 
+    RenderTexture2D glowTexture;
+
 } GameWorld;
 
 /**

@@ -19,6 +19,8 @@
 //#include "raylib/raygui.h"       // other compilation units must only include
 //#undef RAYGUI_IMPLEMENTATION     // raygui.h
 
+#define USE_SHADER true
+
 static int p1PrevPos;
 static int p2PrevPos;
 static Vector2 collisionPos = { -100, -100 };
@@ -33,7 +35,7 @@ GameWorld* createGameWorld( void ) {
 
     GameWorld *gw = (GameWorld*) malloc( sizeof( GameWorld ) );
 
-    gw->cellWidth = 10;
+    gw->cellWidth = 5;
     gw->rows = (int) ( GetScreenHeight() / gw->cellWidth );
     gw->cols = (int) ( GetScreenWidth() / gw->cellWidth );
     gw->grid = (int*) malloc( sizeof(int) * gw->rows * gw->cols );
@@ -50,7 +52,8 @@ GameWorld* createGameWorld( void ) {
     reset( gw );
     gw->state = GAME_STATE_START;
 
-    gridWhite = Fade( WHITE, 0.5f );
+    gridWhite = Fade( WHITE, 0.0f );
+    gw->glowTexture = LoadRenderTexture( GetScreenWidth(), GetScreenHeight() );
 
     return gw;
 
@@ -61,6 +64,7 @@ GameWorld* createGameWorld( void ) {
  */
 void destroyGameWorld( GameWorld *gw ) {
     free( gw->grid );
+    UnloadRenderTexture( gw->glowTexture );
     free( gw );
 }
 
@@ -68,6 +72,18 @@ void destroyGameWorld( GameWorld *gw ) {
  * @brief Reads user input and updates the state of the game.
  */
 void updateGameWorld( GameWorld *gw, float delta ) {
+
+    float screenWidth = GetScreenWidth();
+    float screenHeight = GetScreenHeight();
+    float blurAmount = 3.0f;
+
+    int screenWidthLoc = GetShaderLocation( rm.playerShader, "screenWidth" );
+    int screenHeightLoc = GetShaderLocation( rm.playerShader, "screenHeight" );
+    int blurAmountLoc = GetShaderLocation( rm.playerShader, "blurAmount" );
+
+    SetShaderValue( rm.playerShader, screenWidthLoc, &screenWidth, SHADER_UNIFORM_FLOAT );
+    SetShaderValue( rm.playerShader, screenHeightLoc, &screenHeight, SHADER_UNIFORM_FLOAT );
+    SetShaderValue( rm.playerShader, blurAmountLoc, &blurAmount, SHADER_UNIFORM_FLOAT );
 
     if ( gw->state != GAME_STATE_RUNNING ) {
         if ( IsKeyPressed( KEY_ENTER ) ) {
@@ -95,8 +111,8 @@ void updateGameWorld( GameWorld *gw, float delta ) {
             if ( gw->grid[p1Pos] == 0 ) {
                 gw->grid[p1Pos] = 1;
             } else {
-                /*TraceLog( LOG_INFO, "row: %d | col: %d | pos: %d", p1Row, p1Col, p1Pos );
-                TraceLog( LOG_INFO, "value: %d", gw->grid[p1Pos] );*/
+                //TraceLog( LOG_INFO, "row: %d | col: %d | pos: %d", p1Row, p1Col, p1Pos );
+                //TraceLog( LOG_INFO, "value: %d", gw->grid[p1Pos] );
                 p2Won = true;
             }
         }
@@ -105,8 +121,8 @@ void updateGameWorld( GameWorld *gw, float delta ) {
             if ( gw->grid[p2Pos] == 0 ) {
                 gw->grid[p2Pos] = 2;
             } else {
-                /*TraceLog( LOG_INFO, "row: %d | col: %d | pos: %d", p2Row, p2Col, p2Pos );
-                TraceLog( LOG_INFO, "value: %d", gw->grid[p2Pos] );*/
+                //TraceLog( LOG_INFO, "row: %d | col: %d | pos: %d", p2Row, p2Col, p2Pos );
+                //TraceLog( LOG_INFO, "value: %d", gw->grid[p2Pos] );
                 p1Won = true;
             }
         }
@@ -139,21 +155,8 @@ void updateGameWorld( GameWorld *gw, float delta ) {
  */
 void drawGameWorld( GameWorld *gw ) {
 
-    BeginDrawing();
-    ClearBackground( BLACK );
-
-    if ( gw->drawGridOutline ) {
-        float gridOffset = gw->cellWidth / 2;
-        for ( int i = 1; i <= gw->rows; i++ ) {
-            DrawLine( 0, i*gw->cellWidth - gridOffset, GetScreenWidth(), i*gw->cellWidth - gridOffset, gridWhite );
-        }
-        for ( int i = 1; i <= gw->cols; i++ ) {
-            DrawLine( i*gw->cellWidth - gridOffset, 0, i*gw->cellWidth - gridOffset, GetScreenHeight(), gridWhite );
-        }
-    }
-
-    drawPlayer( &gw->p1 );
-    drawPlayer( &gw->p2 );
+    BeginTextureMode( gw->glowTexture );
+    ClearBackground( BLANK ); // transparent
 
     for ( int i = 0; i < gw->rows; i++ ) {
         for ( int j = 0; j < gw->cols; j++ ) {
@@ -179,6 +182,37 @@ void drawGameWorld( GameWorld *gw ) {
             }
             
         }
+    }
+
+    EndTextureMode();
+
+    BeginDrawing();
+    ClearBackground( BLACK );
+
+    if ( gw->drawGridOutline ) {
+        float gridOffset = gw->cellWidth / 2;
+        for ( int i = 1; i <= gw->rows; i++ ) {
+            DrawLine( 0, i*gw->cellWidth - gridOffset, GetScreenWidth(), i*gw->cellWidth - gridOffset, gridWhite );
+        }
+        for ( int i = 1; i <= gw->cols; i++ ) {
+            DrawLine( i*gw->cellWidth - gridOffset, 0, i*gw->cellWidth - gridOffset, GetScreenHeight(), gridWhite );
+        }
+    }
+
+    drawPlayer( &gw->p1 );
+    drawPlayer( &gw->p2 );
+
+    if ( USE_SHADER ) {
+        BeginShaderMode( rm.playerShader );
+    }
+    DrawTextureRec( 
+        gw->glowTexture.texture, 
+        (Rectangle) { 0, 0, GetScreenWidth(), -GetScreenHeight() }, 
+        (Vector2) { 0 }, 
+        WHITE
+    );
+    if ( USE_SHADER ) {
+        EndShaderMode();
     }
 
     DrawCircleV( collisionPos, 20, RED );
